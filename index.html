@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Форма продаж</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        form { max-width: 800px; margin: auto; }
+        .section { margin-bottom: 20px; }
+        .hidden { display: none; }
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; }
+        .services-list { margin-top: 10px; }
+        .service-item { display: flex; align-items: center; margin-bottom: 10px; }
+        .service-item input[type="checkbox"] { width: auto; margin-right: 10px; }
+        .service-item input[type="number"] { flex: 1; margin-right: 10px; }
+        .service-item label { flex: 2; }
+        #file-attachments { margin-top: 10px; }
+        #submit-btn { padding: 10px 20px; background: #4caf50; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Форма ввода данных о продаже</h1>
+    <form id="sales-form">
+        <!-- Выбор менеджера -->
+        <div class="section">
+            <h2>Выберите ФИО менеджера</h2>
+            <select id="selected-manager" required>
+                <option value="">Выберите менеджера</option>
+            </select>
+        </div>
+
+        <!-- Тип клиента -->
+        <div class="section">
+            <h2>Тип клиента</h2>
+            <select id="client-type" required>
+                <option value="">Выберите тип</option>
+                <option value="FL">ФЛ (Физическое лицо)</option>
+                <option value="UL">ЮЛ (Юридическое лицо)</option>
+                <option value="MP">МП (МаркетПлейс)</option>
+            </select>
+        </div>
+
+        <!-- Поля клиента, динамические -->
+        <div class="section" id="client-details">
+            <h2>Данные клиента</h2>
+            <label>Имя клиента</label>
+            <input type="text" id="client-name" required>
+
+            <div id="phone-section" class="hidden">
+                <label>Номер телефона</label>
+                <input type="tel" id="client-phone" required>
+            </div>
+
+            <div id="company-section" class="hidden">
+                <label>Наименование компании</label>
+                <input type="text" id="company-name" required>
+                <label>ИНН</label>
+                <input type="text" id="company-inn" required>
+            </div>
+
+            <div id="mp-section" class="hidden">
+                <label>Фамилия клиента</label>
+                <input type="text" id="client-surname" required>
+                <label>Номер заказа</label>
+                <input type="text" id="order-number" required>
+            </div>
+        </div>
+
+        <!-- Товар -->
+        <div class="section">
+            <h2>Наименование товара</h2>
+            <input type="text" id="product-name" required>
+        </div>
+
+        <!-- Сумма за товар -->
+        <div class="section">
+            <h2>Сумма за ноутбук</h2>
+            <input type="number" id="product-amount" min="0" required>
+        </div>
+
+        <!-- Дополнительные услуги -->
+        <div class="section">
+            <h2>Дополнительные услуги</h2>
+            <div id="services-list"></div>
+            <h3>Сумма за услуги</h3>
+            <input type="number" id="services-amount" min="0" value="0" readonly>
+        </div>
+
+        <!-- Общая сумма -->
+        <div class="section">
+            <h2>Общая сумма за сделку</h2>
+            <input type="number" id="total-amount" min="0" readonly>
+        </div>
+
+        <!-- Сумма на счет и выбор счета -->
+        <div class="section">
+            <h2>Сумма, поступившая на счет</h2>
+            <input type="number" id="received-amount" min="0" required>
+            <h2>Выберите счет</h2>
+            <select id="account-select" required>
+                <option value="">Загрузка счетов...</option>
+            </select>
+        </div>
+
+        <!-- Наличие на складе -->
+        <div class="section">
+            <h2>Наличие на складе</h2>
+            <select id="stock-status" required>
+                <option value="yes">Есть</option>
+                <option value="no">Нет</option>
+            </select>
+            <div id="stock-yes" class="hidden">
+                <label>Номер сделки</label>
+                <input type="text" id="deal-number">
+            </div>
+            <div id="stock-no" class="hidden">
+                <label>Заказать у поставщика</label>
+                <select id="supplier-select" required>
+                    <option value="">Загрузка поставщиков...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Прикрепление файлов -->
+        <div class="section">
+            <h2>Прикрепите файлы</h2>
+            <input type="file" id="calculator-file" accept=".pdf,.jpg,.png" required> Калькулятор<br>
+            <input type="file" id="payment-file" accept=".pdf,.jpg,.png" required> Платежное поручение/чек/фото средств<br>
+        </div>
+
+        <!-- Кнопка отправки -->
+        <button type="submit" id="submit-btn">Отправить</button>
+    </form>
+
+   <script>
+        // Базовый URL для API
+        const API_BASE_URL = 'https://6eab56b9-6494-427b-b7f0-d23401cef00e.tunnel4.com';
+
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand(); // Расширяет приложение на весь экран
+
+        // Опционально: Установка темы из Telegram
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+        document.body.style.color = tg.themeParams.text_color || '#000000';
+
+        // Функция для загрузки данных с бекенда
+        async function loadData() {
+            try {
+                // Менеджеры
+                const managersResponse = await fetch(`${API_BASE_URL}/api/managers`);
+                const managers = await managersResponse.json();
+                const managerSelect = document.getElementById('selected-manager');
+                managerSelect.innerHTML = '<option value="">Выберите менеджера</option>';
+                managers.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.name;
+                    opt.textContent = m.name;
+                    managerSelect.appendChild(opt);
+                });
+
+                // Счета
+                const accountsResponse = await fetch(`${API_BASE_URL}/api/accounts`);
+                const accounts = await accountsResponse.json();
+                const accountSelect = document.getElementById('account-select');
+                accountSelect.innerHTML = '';
+                accounts.forEach(acc => {
+                    const opt = document.createElement('option');
+                    opt.value = acc.name;
+                    opt.textContent = acc.name;
+                    accountSelect.appendChild(opt);
+                });
+
+                // Поставщики
+                const suppliersResponse = await fetch(`${API_BASE_URL}/api/suppliers`);
+                const suppliers = await suppliersResponse.json();
+                const supplierSelect = document.getElementById('supplier-select');
+                supplierSelect.innerHTML = '';
+                suppliers.forEach(sup => {
+                    const opt = document.createElement('option');
+                    opt.value = sup.name;
+                    opt.textContent = sup.name;
+                    supplierSelect.appendChild(opt);
+                });
+
+                // Услуги
+                const servicesResponse = await fetch(`${API_BASE_URL}/api/services`);
+                const services = await servicesResponse.json();
+                const servicesList = document.getElementById('services-list');
+                services.forEach(service => {
+                    const item = document.createElement('div');
+                    item.classList.add('service-item');
+                    item.innerHTML = `
+                        <input type="checkbox" class="service-checkbox" data-service="${service.name}">
+                        <label>${service.name}</label>
+                        <input type="number" class="service-price" placeholder="Сумма" min="0" disabled>
+                    `;
+                    servicesList.appendChild(item);
+                });
+
+                // Активация полей суммы при включении чекбокса
+                document.querySelectorAll('.service-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        const priceInput = checkbox.parentElement.querySelector('.service-price');
+                        priceInput.disabled = !checkbox.checked;
+                        if (!checkbox.checked) priceInput.value = '';
+                        updateServicesAmount();
+                    });
+                });
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                alert('Не удалось загрузить данные с сервера');
+            }
+        }
+
+        // Динамика для типа клиента
+        document.getElementById('client-type').addEventListener('change', (e) => {
+            const type = e.target.value;
+            document.getElementById('phone-section').classList.add('hidden');
+            document.getElementById('company-section').classList.add('hidden');
+            document.getElementById('mp-section').classList.add('hidden');
+
+            if (type === 'FL') {
+                document.getElementById('phone-section').classList.remove('hidden');
+                setRequired('client-phone', true);
+                setRequired('company-name', false);
+                setRequired('company-inn', false);
+                setRequired('client-surname', false);
+                setRequired('order-number', false);
+            } else if (type === 'UL') {
+                document.getElementById('phone-section').classList.remove('hidden');
+                document.getElementById('company-section').classList.remove('hidden');
+                setRequired('client-phone', true);
+                setRequired('company-name', true);
+                setRequired('company-inn', true);
+                setRequired('client-surname', false);
+                setRequired('order-number', false);
+            } else if (type === 'MP') {
+                document.getElementById('mp-section').classList.remove('hidden');
+                setRequired('client-phone', false);
+                setRequired('company-name', false);
+                setRequired('company-inn', false);
+                setRequired('client-surname', true);
+                setRequired('order-number', true);
+            }
+        });
+
+        function setRequired(id, required) {
+            const elem = document.getElementById(id);
+            if (elem) elem.required = required;
+        }
+
+        // Динамика для наличия на складе
+        document.getElementById('stock-status').addEventListener('change', (e) => {
+            const status = e.target.value;
+            document.getElementById('stock-yes').classList.add('hidden');
+            document.getElementById('stock-no').classList.add('hidden');
+
+            if (status === 'yes') {
+                document.getElementById('stock-yes').classList.remove('hidden');
+                setRequired('deal-number', true);
+                setRequired('supplier-select', false);
+            } else if (status === 'no') {
+                document.getElementById('stock-no').classList.remove('hidden');
+                setRequired('deal-number', false);
+                setRequired('supplier-select', true);
+            }
+        });
+
+        // Обновление суммы за услуги и общей суммы
+        function updateServicesAmount() {
+            const prices = [...document.querySelectorAll('.service-item')].map(item => {
+                const checkbox = item.querySelector('.service-checkbox');
+                const priceInput = item.querySelector('.service-price');
+                return checkbox.checked ? parseFloat(priceInput.value) || 0 : 0;
+            });
+            const servicesSum = prices.reduce((a, b) => a + b, 0);
+            document.getElementById('services-amount').value = servicesSum;
+            updateTotalAmount();
+        }
+
+        function updateTotalAmount() {
+            const productAmount = parseFloat(document.getElementById('product-amount').value) || 0;
+            const servicesAmount = parseFloat(document.getElementById('services-amount').value) || 0;
+            document.getElementById('total-amount').value = productAmount + servicesAmount;
+        }
+
+        // Слушатели для обновлений
+        document.getElementById('product-amount').addEventListener('input', updateTotalAmount);
+        document.getElementById('services-list').addEventListener('input', updateServicesAmount);
+
+        // Отправка формы
+        document.getElementById('sales-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Сбор данных
+            const data = {
+                manager: document.getElementById('selected-manager').value,
+                clientType: document.getElementById('client-type').value,
+                clientName: document.getElementById('client-name').value,
+                clientPhone: document.getElementById('client-phone').value || null,
+                companyName: document.getElementById('company-name').value || null,
+                companyInn: document.getElementById('company-inn').value || null,
+                clientSurname: document.getElementById('client-surname').value || null,
+                orderNumber: document.getElementById('order-number').value || null,
+                productName: document.getElementById('product-name').value,
+                productAmount: parseFloat(document.getElementById('product-amount').value),
+                services: [...document.querySelectorAll('.service-item')].map(item => {
+                    const checkbox = item.querySelector('.service-checkbox');
+                    const priceInput = item.querySelector('.service-price');
+                    return {
+                        name: checkbox.dataset.service,
+                        price: checkbox.checked ? parseFloat(priceInput.value) || 0 : 0
+                    };
+                }).filter(s => s.price > 0),
+                servicesAmount: parseFloat(document.getElementById('services-amount').value),
+                totalAmount: parseFloat(document.getElementById('total-amount').value),
+                receivedAmount: parseFloat(document.getElementById('received-amount').value),
+                account: document.getElementById('account-select').value,
+                stockStatus: document.getElementById('stock-status').value,
+                dealNumber: document.getElementById('deal-number').value || null,
+                supplier: document.getElementById('supplier-select').value || null
+            };
+
+            // Проверка файлов
+            const calculatorFile = document.getElementById('calculator-file').files[0];
+            const paymentFile = document.getElementById('payment-file').files[0];
+            if (!calculatorFile || !paymentFile) {
+                alert('Прикрепите все необходимые файлы!');
+                return;
+            }
+
+            // Отправка на бекенд
+            const formData = new FormData();
+            formData.append('sale', JSON.stringify(data));
+            formData.append('calculator_file', calculatorFile);
+            formData.append('payment_file', paymentFile);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/submit`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Сделка успешно сохранена: ' + result.message);
+                } else {
+                    alert('Ошибка: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('Ошибка отправки:', error);
+                alert('Не удалось отправить данные');
+            }
+        });
+
+        // Инициализация
+        loadData();
+    </script>
+</body>
+</html>
