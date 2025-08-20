@@ -1,362 +1,292 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Форма продаж</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        form { max-width: 800px; margin: auto; }
-        .section { margin-bottom: 20px; }
-        .hidden { display: none; }
-        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; }
-        .services-list { margin-top: 10px; }
-        .service-item { display: flex; align-items: center; margin-bottom: 10px; }
-        .service-item input[type="checkbox"] { width: auto; margin-right: 10px; }
-        .service-item input[type="number"] { flex: 1; margin-right: 10px; }
-        .service-item label { flex: 2; }
-        #file-attachments { margin-top: 10px; }
-        #submit-btn { padding: 10px 20px; background: #4caf50; color: white; border: none; cursor: pointer; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Форма сделки</title>
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; }
+    .block { border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px; background: #f8f9fa; }
+    .service { border-left: 3px solid #0d6efd; margin: 10px 0; padding-left: 10px; }
+    .totals p { margin: 0; }
+  </style>
 </head>
 <body>
-    <h1>Форма ввода данных о продаже</h1>
-    <form id="sales-form">
-        <!-- Выбор менеджера -->
-        <div class="section">
-            <h2>Выберите ФИО менеджера</h2>
-            <select id="selected-manager" required>
-                <option value="">Выберите менеджера</option>
-            </select>
-        </div>
+  <div class="container">
+    <h2 class="mb-4">Форма сделки</h2>
 
-        <!-- Тип клиента -->
-        <div class="section">
-            <h2>Тип клиента</h2>
-            <select id="client-type" required>
-                <option value="">Выберите тип</option>
-                <option value="FL">ФЛ (Физическое лицо)</option>
-                <option value="UL">ЮЛ (Юридическое лицо)</option>
-                <option value="MP">МП (МаркетПлейс)</option>
-            </select>
-        </div>
+    <div class="mb-3">
+      <label class="form-label">Менеджер:</label>
+      <select id="manager" class="form-select" required>
+        <option value="">-- выберите --</option>
+        <option value="Иванов">Иванов</option>
+        <option value="Петров">Петров</option>
+        <option value="Сидоров">Сидоров</option>
+      </select>
+    </div>
 
-        <!-- Поля клиента, динамические -->
-        <div class="section" id="client-details">
-            <h2>Данные клиента</h2>
-            <label>Имя клиента</label>
-            <input type="text" id="client-name" required>
+    <div class="mb-3">
+      <label class="form-label">Тип клиента:</label>
+      <select id="clientType" class="form-select" onchange="toggleClientFields()" required>
+        <option value="">-- выберите --</option>
+        <option value="ФЛ">ФЛ</option>
+        <option value="ЮЛ">ЮЛ</option>
+        <option value="МП">МП</option>
+      </select>
+    </div>
 
-            <div id="phone-section" class="hidden">
-                <label>Номер телефона</label>
-                <input type="tel" id="client-phone" required>
-            </div>
+    <div id="clientFields" class="block">
+      <div class="mb-3">
+        <label class="form-label">ФИО клиента:</label>
+        <input type="text" id="clientName" class="form-control" required>
+      </div>
+      <div class="mb-3" id="phoneField">
+        <label class="form-label">Телефон:</label>
+        <input type="text" id="clientPhone" class="form-control" required>
+      </div>
+      <div id="extraFields"></div>
+    </div>
 
-            <div id="company-section" class="hidden">
-                <label>Наименование компании</label>
-                <input type="text" id="company-name" required>
-                <label>ИНН</label>
-                <input type="text" id="company-inn" required>
-            </div>
+    <h4>Товары</h4>
+    <div id="products"></div>
+    <button type="button" class="btn btn-primary btn-sm mb-3" onclick="addProduct()">+ Добавить товар</button>
 
-            <div id="mp-section" class="hidden">
-                <label>Фамилия клиента</label>
-                <input type="text" id="client-surname" required>
-                <label>Номер заказа</label>
-                <input type="text" id="order-number" required>
-            </div>
-        </div>
+    <div class="totals alert alert-info">
+      <p>Сумма за товары: <span id="totalProducts">0</span></p>
+      <p>Сумма за услуги: <span id="totalServices">0</span></p>
+      <p>Общая сумма сделки: <span id="grandTotal">0</span></p>
+    </div>
 
-        <!-- Товар -->
-        <div class="section">
-            <h2>Наименование товара</h2>
-            <input type="text" id="product-name" required>
-        </div>
+    <h4>Финансы</h4>
+    <div class="mb-3">
+      <label class="form-label">Сумма, поступившая на счёт:</label>
+      <input type="number" id="accountAmount" class="form-control" value="0" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Счёт:</label>
+      <select id="account" class="form-select" required>
+        <option value="">-- выберите --</option>
+        <option value="Счёт №1">Счёт №1</option>
+        <option value="Счёт №2">Счёт №2</option>
+        <option value="Счёт №3">Счёт №3</option>
+      </select>
+    </div>
 
-        <!-- Сумма за товар -->
-        <div class="section">
-            <h2>Сумма за ноутбук</h2>
-            <input type="number" id="product-amount" min="0" required>
-        </div>
+    <h4>Склад</h4>
+    <div class="mb-3">
+      <label class="form-label">Наличие:</label>
+      <select id="stockStatus" class="form-select" onchange="toggleStockFields()" required>
+        <option value="">-- выберите --</option>
+        <option value="Есть">Есть</option>
+        <option value="Нет">Нет</option>
+      </select>
+    </div>
+    <div id="stockExtra"></div>
 
-        <!-- Дополнительные услуги -->
-        <div class="section">
-            <h2>Дополнительные услуги</h2>
-            <div id="services-list"></div>
-            <h3>Сумма за услуги</h3>
-            <input type="number" id="services-amount" min="0" value="0" readonly>
-        </div>
+    <h4>Файлы</h4>
+    <div class="mb-3">
+      <label class="form-label">Калькулятор:</label>
+      <input type="file" id="calculator" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Платёжное поручение / Чек / Фото:</label>
+      <input type="file" id="paymentFile" class="form-control" required>
+    </div>
 
-        <!-- Общая сумма -->
-        <div class="section">
-            <h2>Общая сумма за сделку</h2>
-            <input type="number" id="total-amount" min="0" readonly>
-        </div>
+    <button type="button" class="btn btn-success mb-3" onclick="generateMessage()">Сформировать сообщение</button>
 
-        <!-- Сумма на счет и выбор счета -->
-        <div class="section">
-            <h2>Сумма, поступившая на счет</h2>
-            <input type="number" id="received-amount" min="0" required>
-            <h2>Выберите счет</h2>
-            <select id="account-select" required>
-                <option value="">Загрузка счетов...</option>
-            </select>
-        </div>
+    <h4>Сообщение</h4>
+    <textarea id="result" rows="15" class="form-control" readonly></textarea>
+  </div>
 
-        <!-- Наличие на складе -->
-        <div class="section">
-            <h2>Наличие на складе</h2>
-            <select id="stock-status" required>
-                <option value="yes">Есть</option>
-                <option value="no">Нет</option>
-            </select>
-            <div id="stock-yes" class="hidden">
-                <label>Номер сделки</label>
-                <input type="text" id="deal-number">
-            </div>
-            <div id="stock-no" class="hidden">
-                <label>Заказать у поставщика</label>
-                <select id="supplier-select" required>
-                    <option value="">Загрузка поставщиков...</option>
-                </select>
-            </div>
-        </div>
+<script>
+let productCount = 0;
 
-        <!-- Прикрепление файлов -->
-        <div class="section">
-            <h2>Прикрепите файлы</h2>
-            <input type="file" id="calculator-file" accept=".pdf,.jpg,.png" required> Калькулятор<br>
-            <input type="file" id="payment-file" accept=".pdf,.jpg,.png" required> Платежное поручение/чек/фото средств<br>
-        </div>
+function toggleClientFields() {
+  let type = document.getElementById("clientType").value;
+  let phoneField = document.getElementById("phoneField");
+  let extra = document.getElementById("extraFields");
+  extra.innerHTML = "";
 
-        <!-- Кнопка отправки -->
-        <button type="submit" id="submit-btn">Отправить</button>
-    </form>
+  if (type === "ЮЛ") {
+    phoneField.style.display = "block";
+    document.getElementById("clientPhone").required = true;
+    extra.innerHTML = `
+      <div class="mb-3">
+        <label class="form-label">Компания:</label>
+        <input type="text" id="company" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">ИНН:</label>
+        <input type="text" id="inn" class="form-control" required>
+      </div>`;
+  } else if (type === "МП") {
+    phoneField.style.display = "none";
+    document.getElementById("clientPhone").required = false;
+    extra.innerHTML = `
+      <div class="mb-3">
+        <label class="form-label">Номер заказа:</label>
+        <input type="text" id="orderNumber" class="form-control" required>
+      </div>`;
+  } else {
+    phoneField.style.display = "block";
+    document.getElementById("clientPhone").required = true;
+  }
+}
 
-   <script>
-        // Базовый URL для API
-        const API_BASE_URL = 'https://6eab56b9-6494-427b-b7f0-d23401cef00e.tunnel4.com';
+function addProduct() {
+  let productsDiv = document.getElementById("products");
+  let productBlock = document.createElement("div");
+  productBlock.className = "block product";
+  productBlock.innerHTML = `
+    <div class="mb-3">
+      <label class="form-label">Наименование товара:</label>
+      <input type="text" class="form-control productName" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Сумма за товар:</label>
+      <input type="number" class="form-control productPrice" value="0" required oninput="recalculateTotals()">
+    </div>
+    <div class="services"></div>
+    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addService(this)">+ Добавить услугу</button>
+  `;
+  productsDiv.appendChild(productBlock);
+  recalculateTotals();
+}
 
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand(); // Расширяет приложение на весь экран
+function addService(button) {
+  let servicesDiv = button.previousElementSibling;
+  let service = document.createElement("div");
+  service.className = "service";
+  service.innerHTML = `
+    <div class="mb-3">
+      <label class="form-label">Услуга:</label>
+      <select class="form-select serviceName" required>
+        <option value="Гравировка">Гравировка</option>
+        <option value="ОС">Установка ОС</option>
+        <option value="Замена комплектующих">Замена комплектующих</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Цена услуги:</label>
+      <input type="number" class="form-control servicePrice" value="0" required oninput="recalculateTotals()">
+    </div>
+  `;
+  servicesDiv.appendChild(service);
+  recalculateTotals();
+}
 
-        // Опционально: Установка темы из Telegram
-        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
-        document.body.style.color = tg.themeParams.text_color || '#000000';
+function toggleStockFields() {
+  let status = document.getElementById("stockStatus").value;
+  let extra = document.getElementById("stockExtra");
+  extra.innerHTML = "";
+  if (status === "Есть") {
+    extra.innerHTML = `
+      <div class="mb-3">
+        <label class="form-label">Номер сделки:</label>
+        <input type="text" id="dealNumber" class="form-control" required>
+      </div>`;
+  } else if (status === "Нет") {
+    extra.innerHTML = `
+      <div class="mb-3">
+        <label class="form-label">Заказать у:</label>
+        <select id="supplier" class="form-select" required>
+          <option value="Шуитао">Шуитао</option>
+          <option value="Кай">Кай</option>
+          <option value="Шукур">Шукур</option>
+        </select>
+      </div>`;
+  }
+}
 
-        // Функция для загрузки данных с бекенда
-        async function loadData() {
-            try {
-                // Менеджеры
-                const managersResponse = await fetch(`${API_BASE_URL}/api/managers`);
-                const managers = await managersResponse.json();
-                const managerSelect = document.getElementById('selected-manager');
-                managerSelect.innerHTML = '<option value="">Выберите менеджера</option>';
-                managers.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m.name;
-                    opt.textContent = m.name;
-                    managerSelect.appendChild(opt);
-                });
+function recalculateTotals() {
+  let products = document.querySelectorAll(".product");
+  let totalProducts = 0;
+  let totalServices = 0;
 
-                // Счета
-                const accountsResponse = await fetch(`${API_BASE_URL}/api/accounts`);
-                const accounts = await accountsResponse.json();
-                const accountSelect = document.getElementById('account-select');
-                accountSelect.innerHTML = '';
-                accounts.forEach(acc => {
-                    const opt = document.createElement('option');
-                    opt.value = acc.name;
-                    opt.textContent = acc.name;
-                    accountSelect.appendChild(opt);
-                });
+  products.forEach(p => {
+    let pprice = +p.querySelector(".productPrice").value || 0;
+    totalProducts += pprice;
+    let services = p.querySelectorAll(".service");
+    services.forEach(s => {
+      totalServices += +s.querySelector(".servicePrice").value || 0;
+    });
+  });
 
-                // Поставщики
-                const suppliersResponse = await fetch(`${API_BASE_URL}/api/suppliers`);
-                const suppliers = await suppliersResponse.json();
-                const supplierSelect = document.getElementById('supplier-select');
-                supplierSelect.innerHTML = '';
-                suppliers.forEach(sup => {
-                    const opt = document.createElement('option');
-                    opt.value = sup.name;
-                    opt.textContent = sup.name;
-                    supplierSelect.appendChild(opt);
-                });
+  let grand = totalProducts + totalServices;
+  document.getElementById("totalProducts").innerText = totalProducts;
+  document.getElementById("totalServices").innerText = totalServices;
+  document.getElementById("grandTotal").innerText = grand;
+}
 
-                // Услуги
-                const servicesResponse = await fetch(`${API_BASE_URL}/api/services`);
-                const services = await servicesResponse.json();
-                const servicesList = document.getElementById('services-list');
-                services.forEach(service => {
-                    const item = document.createElement('div');
-                    item.classList.add('service-item');
-                    item.innerHTML = `
-                        <input type="checkbox" class="service-checkbox" data-service="${service.name}">
-                        <label>${service.name}</label>
-                        <input type="number" class="service-price" placeholder="Сумма" min="0" disabled>
-                    `;
-                    servicesList.appendChild(item);
-                });
+function generateMessage() {
+  let manager = document.getElementById("manager").value;
+  let clientType = document.getElementById("clientType").value;
+  let name = document.getElementById("clientName").value;
+  let phone = document.getElementById("clientPhone").value;
 
-                // Активация полей суммы при включении чекбокса
-                document.querySelectorAll('.service-checkbox').forEach(checkbox => {
-                    checkbox.addEventListener('change', () => {
-                        const priceInput = checkbox.parentElement.querySelector('.service-price');
-                        priceInput.disabled = !checkbox.checked;
-                        if (!checkbox.checked) priceInput.value = '';
-                        updateServicesAmount();
-                    });
-                });
-            } catch (error) {
-                console.error('Ошибка загрузки данных:', error);
-                alert('Не удалось загрузить данные с сервера');
-            }
-        }
+  let clientExtra = "";
+  if (clientType === "ЮЛ") {
+    clientExtra = `Компания: ${document.getElementById("company").value}, ИНН: ${document.getElementById("inn").value}`;
+  } else if (clientType === "МП") {
+    clientExtra = `Номер заказа: ${document.getElementById("orderNumber").value}`;
+  }
 
-        // Динамика для типа клиента
-        document.getElementById('client-type').addEventListener('change', (e) => {
-            const type = e.target.value;
-            document.getElementById('phone-section').classList.add('hidden');
-            document.getElementById('company-section').classList.add('hidden');
-            document.getElementById('mp-section').classList.add('hidden');
+  let products = document.querySelectorAll(".product");
+  let productsText = "";
+  products.forEach((p, idx) => {
+    let pname = p.querySelector(".productName").value;
+    let pprice = +p.querySelector(".productPrice").value;
+    let services = p.querySelectorAll(".service");
+    let serviceText = "";
+    services.forEach(s => {
+      let sname = s.querySelector(".serviceName").value;
+      let sprice = +s.querySelector(".servicePrice").value;
+      serviceText += `\n      - ${sname}: ${sprice}`;
+    });
+    productsText += `\nТовар ${idx+1}: ${pname}, цена: ${pprice}, услуги: ${serviceText}`;
+  });
 
-            if (type === 'FL') {
-                document.getElementById('phone-section').classList.remove('hidden');
-                setRequired('client-phone', true);
-                setRequired('company-name', false);
-                setRequired('company-inn', false);
-                setRequired('client-surname', false);
-                setRequired('order-number', false);
-            } else if (type === 'UL') {
-                document.getElementById('phone-section').classList.remove('hidden');
-                document.getElementById('company-section').classList.remove('hidden');
-                setRequired('client-phone', true);
-                setRequired('company-name', true);
-                setRequired('company-inn', true);
-                setRequired('client-surname', false);
-                setRequired('order-number', false);
-            } else if (type === 'MP') {
-                document.getElementById('mp-section').classList.remove('hidden');
-                setRequired('client-phone', false);
-                setRequired('company-name', false);
-                setRequired('company-inn', false);
-                setRequired('client-surname', true);
-                setRequired('order-number', true);
-            }
-        });
+  let accountAmount = document.getElementById("accountAmount").value;
+  let account = document.getElementById("account").value;
 
-        function setRequired(id, required) {
-            const elem = document.getElementById(id);
-            if (elem) elem.required = required;
-        }
+  let stockStatus = document.getElementById("stockStatus").value;
+  let stockExtra = "";
+  if (stockStatus === "Есть") {
+    stockExtra = `Номер сделки: ${document.getElementById("dealNumber").value}`;
+  } else {
+    stockExtra = `Заказать у: ${document.getElementById("supplier").value}`;
+  }
 
-        // Динамика для наличия на складе
-        document.getElementById('stock-status').addEventListener('change', (e) => {
-            const status = e.target.value;
-            document.getElementById('stock-yes').classList.add('hidden');
-            document.getElementById('stock-no').classList.add('hidden');
+  let calcAttached = document.getElementById("calculator").files.length > 0 ? "Да" : "Нет";
+  let paymentAttached = document.getElementById("paymentFile").files.length > 0 ? "Да" : "Нет";
 
-            if (status === 'yes') {
-                document.getElementById('stock-yes').classList.remove('hidden');
-                setRequired('deal-number', true);
-                setRequired('supplier-select', false);
-            } else if (status === 'no') {
-                document.getElementById('stock-no').classList.remove('hidden');
-                setRequired('deal-number', false);
-                setRequired('supplier-select', true);
-            }
-        });
+  let totalProducts = document.getElementById("totalProducts").innerText;
+  let totalServices = document.getElementById("totalServices").innerText;
+  let grandTotal = document.getElementById("grandTotal").innerText;
 
-        // Обновление суммы за услуги и общей суммы
-        function updateServicesAmount() {
-            const prices = [...document.querySelectorAll('.service-item')].map(item => {
-                const checkbox = item.querySelector('.service-checkbox');
-                const priceInput = item.querySelector('.service-price');
-                return checkbox.checked ? parseFloat(priceInput.value) || 0 : 0;
-            });
-            const servicesSum = prices.reduce((a, b) => a + b, 0);
-            document.getElementById('services-amount').value = servicesSum;
-            updateTotalAmount();
-        }
+  let result = `
+Менеджер: ${manager}
+Тип клиента: ${clientType}
+Клиент: ${name}${clientType !== "МП" ? ", Телефон: " + phone : ""}
+${clientExtra}
 
-        function updateTotalAmount() {
-            const productAmount = parseFloat(document.getElementById('product-amount').value) || 0;
-            const servicesAmount = parseFloat(document.getElementById('services-amount').value) || 0;
-            document.getElementById('total-amount').value = productAmount + servicesAmount;
-        }
+${productsText}
 
-        // Слушатели для обновлений
-        document.getElementById('product-amount').addEventListener('input', updateTotalAmount);
-        document.getElementById('services-list').addEventListener('input', updateServicesAmount);
+Сумма за товары: ${totalProducts}
+Сумма за услуги: ${totalServices}
+Общая сумма сделки: ${grandTotal}
 
-        // Отправка формы
-        document.getElementById('sales-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
+Поступило: ${accountAmount} на ${account}
 
-            // Сбор данных
-            const data = {
-                manager: document.getElementById('selected-manager').value,
-                clientType: document.getElementById('client-type').value,
-                clientName: document.getElementById('client-name').value,
-                clientPhone: document.getElementById('client-phone').value || null,
-                companyName: document.getElementById('company-name').value || null,
-                companyInn: document.getElementById('company-inn').value || null,
-                clientSurname: document.getElementById('client-surname').value || null,
-                orderNumber: document.getElementById('order-number').value || null,
-                productName: document.getElementById('product-name').value,
-                productAmount: parseFloat(document.getElementById('product-amount').value),
-                services: [...document.querySelectorAll('.service-item')].map(item => {
-                    const checkbox = item.querySelector('.service-checkbox');
-                    const priceInput = item.querySelector('.service-price');
-                    return {
-                        name: checkbox.dataset.service,
-                        price: checkbox.checked ? parseFloat(priceInput.value) || 0 : 0
-                    };
-                }).filter(s => s.price > 0),
-                servicesAmount: parseFloat(document.getElementById('services-amount').value),
-                totalAmount: parseFloat(document.getElementById('total-amount').value),
-                receivedAmount: parseFloat(document.getElementById('received-amount').value),
-                account: document.getElementById('account-select').value,
-                stockStatus: document.getElementById('stock-status').value,
-                dealNumber: document.getElementById('deal-number').value || null,
-                supplier: document.getElementById('supplier-select').value || null
-            };
+Склад: ${stockStatus}, ${stockExtra}
 
-            // Проверка файлов
-            const calculatorFile = document.getElementById('calculator-file').files[0];
-            const paymentFile = document.getElementById('payment-file').files[0];
-            if (!calculatorFile || !paymentFile) {
-                alert('Прикрепите все необходимые файлы!');
-                return;
-            }
-
-            // Отправка на бекенд
-            const formData = new FormData();
-            formData.append('sale', JSON.stringify(data));
-            formData.append('calculator_file', calculatorFile);
-            formData.append('payment_file', paymentFile);
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/submit`, {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                if (response.ok) {
-                    alert('Сделка успешно сохранена: ' + result.message);
-                } else {
-                    alert('Ошибка: ' + result.detail);
-                }
-            } catch (error) {
-                console.error('Ошибка отправки:', error);
-                alert('Не удалось отправить данные');
-            }
-        });
-
-        // Инициализация
-        loadData();
-    </script>
+Калькулятор: ${calcAttached}
+Платёжный документ: ${paymentAttached}
+  `;
+  document.getElementById("result").value = result.trim();
+}
+</script>
 </body>
 </html>
