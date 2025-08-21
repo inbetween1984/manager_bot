@@ -97,7 +97,7 @@
   tg.ready();
   tg.expand();
 
-  API_BASE = "https://dba2cc25-d40f-4d8e-9867-161bfd006bc4.tunnel4.com"
+  API_BASE = "https://edd4d3e9-baa7-46d6-a71a-c2d887c5b255.tunnel4.com"
 async function loadOptions(endpoint, selectId, placeholder="-- выберите --") {
   try {
     let response = await fetch(endpoint);
@@ -294,11 +294,13 @@ async function submitForm() {
     chat_id: tg.initDataUnsafe?.user?.id || null
   };
 
+  const formData = new FormData();
+  formData.append('sale', JSON.stringify(payload));
+
   try {
     let response = await fetch(`${API_BASE}/api/submit`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     if (!response.ok) throw new Error("Ошибка при отправке: " + response.status);
