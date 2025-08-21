@@ -88,7 +88,6 @@
       <input type="file" id="paymentFile" class="form-control" required>
     </div>
 
-    <!-- ЗАМЕНА КНОПКИ -->
     <button type="button" class="btn btn-success mb-3" onclick="submitForm()">Отправить</button>
   </div>
 
@@ -97,7 +96,7 @@
   tg.ready();
   tg.expand();
 
-  API_BASE = "https://10347d48-74a3-4588-add0-33482174ceea.tunnel4.com"
+  API_BASE = "https://4ab1b24b-2fae-4dc5-b091-63c08ebb5152.tunnel4.com"
 async function loadOptions(endpoint, selectId, placeholder="-- выберите --") {
   try {
     let response = await fetch(endpoint);
@@ -296,6 +295,8 @@ async function submitForm() {
 
   const formData = new FormData();
   formData.append('sale', JSON.stringify(payload));
+  formData.append('calculator', document.getElementById("calculator").files[0]);
+  formData.append('paymentFile', document.getElementById("paymentFile").files[0]);
 
   try {
     let response = await fetch(`${API_BASE}/api/submit`, {
