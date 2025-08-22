@@ -95,7 +95,6 @@
   tg.ready();
   tg.expand();
 
-  API_BASE = "https://de93e14f-791a-4d53-a5e0-41b970e07cda.tunnel4.com"
 async function loadOptions(endpoint, selectId, placeholder="-- выберите --") {
   try {
     let response = await fetch(endpoint);
@@ -118,8 +117,8 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  loadOptions(`${API_BASE}/api/managers`, "manager");
-  loadOptions(`${API_BASE}/api/accounts`, "account");
+  loadOptions(`api/managers`, "manager");
+  loadOptions(`api/accounts`, "account");
 });
 
 function toggleClientFields() {
@@ -215,7 +214,7 @@ function toggleStockFields() {
           <option value="">-- загружается... --</option>
         </select>
       </div>`;
-    loadOptions(`${API_BASE}/api/suppliers`, "supplier");
+    loadOptions(`api/suppliers`, "supplier");
   }
 }
 
@@ -298,7 +297,7 @@ async function submitForm() {
   formData.append('paymentFile', document.getElementById("paymentFile").files[0]);
 
   try {
-    let response = await fetch(`${API_BASE}/api/submit`, {
+    let response = await fetch(`api/submit`, {
       method: "POST",
       body: formData
     });
