@@ -4,6 +4,8 @@ import gspread
 import requests
 from fastapi import UploadFile
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+
 from schemas import Deal
 from config import BOT_TOKEN, SPREADSHEET_ID
 
@@ -11,6 +13,27 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 CREDS = Credentials.from_service_account_file("manager-bot-project-099aa7e351ba.json", scopes=SCOPES)
 gc = gspread.authorize(CREDS)
 
+def get_sheets_service():
+    return build("sheets", "v4", credentials=CREDS)
+
+
+def get_dropdown_by_index(sheet_index: int, row_idx: int, col_idx: int):
+    service = get_sheets_service()
+
+    sheet_metadata = service.spreadsheets().get(
+        spreadsheetId=SPREADSHEET_ID,
+        fields="sheets(data(rowData(values(dataValidation))))"
+    ).execute()
+
+    row_data = sheet_metadata['sheets'][sheet_index]['data'][0].get('rowData', [])
+    if len(row_data) > row_idx and 'values' in row_data[row_idx]:
+        cell_data = row_data[row_idx]['values'][col_idx]
+        data_validation = cell_data.get('dataValidation')
+
+        if data_validation and 'condition' in data_validation:
+            return [v['userEnteredValue'] for v in data_validation['condition']['values']]
+
+    return []
 
 def save_deal_to_sheet(data: dict):
    try:
@@ -21,8 +44,8 @@ def save_deal_to_sheet(data: dict):
 
         product_names = [p.name for p in deal.products]
         product_cell = f"{len(product_names)} шт.; " + "; ".join(product_names)
-        status_product = "заказать" if deal.stock.status == "Нет" else ""
-        status_sale = "Резерв" if deal.clientType in ("ФЛ", "ЮЛ") else "Отсрочка платежа"
+        status_product = "Заказать" if deal.stock.status == "Нет" else ""
+        status_sale = "Резерв" if deal.clientType in ("ФЛ", "ЮЛ") else "Отсрочка оплаты"
 
         row = [
             "", "", product_cell, "", "", "", status_product, status_sale,
@@ -30,7 +53,7 @@ def save_deal_to_sheet(data: dict):
             "", deal.clientType, deal.client.name, deal.client.phone or ""
         ]
         next_row = len(ws.get_all_values()) + 1
-        ws.append_row(row, table_range=f"A{next_row}:U{next_row}")
+        ws.update(f"A{next_row}:U{next_row}", [row])
 
         return {"status": "ok", "row": next_row}
 

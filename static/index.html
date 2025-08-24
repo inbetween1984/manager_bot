@@ -62,7 +62,10 @@
     <div class="mb-3">
       <label class="form-label">Счёт:</label>
       <select id="account" class="form-select" required>
-        <option value="">-- загружается... --</option>
+        <option value="">-- выберите... --</option>
+        <option value="Счет1">Счет1</option>
+        <option value="Счет2">Счет2</option>
+        <option value="Счет3">Счет3</option>
       </select>
     </div>
 
@@ -118,7 +121,7 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
 
 document.addEventListener("DOMContentLoaded", () => {
   loadOptions(`api/managers`, "manager");
-  loadOptions(`api/accounts`, "account");
+  // loadOptions(`api/accounts`, "account");
 });
 
 function toggleClientFields() {
