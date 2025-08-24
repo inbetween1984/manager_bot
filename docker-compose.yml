@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  bot:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./manager-bot-project-099aa7e351ba.json:/app/manager-bot-project-099aa7e351ba.json:ro
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
