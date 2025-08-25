@@ -40,7 +40,7 @@ def save_deal_to_sheet(data: dict):
         deal = Deal(**data)
 
         sh = gc.open_by_key(SPREADSHEET_ID)
-        ws = sh.sheet1
+        ws = sh.worksheet("Склад")
 
         product_names = [p.name for p in deal.products]
         product_cell = f"{len(product_names)} шт.; " + "; ".join(product_names)

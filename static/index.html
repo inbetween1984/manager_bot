@@ -63,9 +63,9 @@
       <label class="form-label">Счёт:</label>
       <select id="account" class="form-select" required>
         <option value="">-- выберите... --</option>
-        <option value="Счет1">Счет1</option>
-        <option value="Счет2">Счет2</option>
-        <option value="Счет3">Счет3</option>
+        <option value="Сергей Сбербанк">Сергей Сбербанк</option>
+          <option value="ООО Супертек">ООО Супертек</option>
+        <option value="ИП Сергей">ИП Сергей</option>
       </select>
     </div>
 
@@ -291,7 +291,7 @@ async function submitForm() {
     totals: { products: totalProducts, services: totalServices, grand: grandTotal },
     finance: { accountAmount, account },
     stock: { status: stockStatus, ...stockExtra },
-    chat_id: tg.initDataUnsafe?.user?.id || null
+    chat_id: -1002765511254
   };
 
   const formData = new FormData();
