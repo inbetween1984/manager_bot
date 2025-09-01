@@ -62,10 +62,7 @@
     <div class="mb-3">
       <label class="form-label">Счёт:</label>
       <select id="account" class="form-select" required>
-        <option value="">-- выберите... --</option>
-        <option value="Сергей Сбербанк">Сергей Сбербанк</option>
-          <option value="ООО Супертек">ООО Супертек</option>
-        <option value="ИП Сергей">ИП Сергей</option>
+        <option value="">-- загружается... --</option>
       </select>
     </div>
 
@@ -121,7 +118,7 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
 
 document.addEventListener("DOMContentLoaded", () => {
   loadOptions(`api/managers`, "manager");
-  // loadOptions(`api/accounts`, "account");
+  loadOptions(`api/accounts`, "account");
 });
 
 function toggleClientFields() {
@@ -161,17 +158,22 @@ function addProduct() {
   let productBlock = document.createElement("div");
   productBlock.className = "block product";
   productBlock.innerHTML = `
-    <div class="mb-3">
-      <label class="form-label">Наименование товара:</label>
-      <input type="text" class="form-control productName" required>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Сумма за товар:</label>
-      <input type="number" class="form-control productPrice" value="0" required oninput="recalculateTotals()">
-    </div>
-    <div class="services"></div>
-    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addService(this)">+ Добавить услугу</button>
-  `;
+  <div class="mb-3">
+    <label class="form-label">Наименование товара:</label>
+    <input type="text" class="form-control productName" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Количество:</label>
+    <input type="number" class="form-control productQuantity" value="1" min="1" required oninput="recalculateTotals()">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Цена за единицу:</label>
+    <input type="number" class="form-control productPrice" value="0" required oninput="recalculateTotals()">
+  </div>
+  <div class="services"></div>
+  <button type="button" class="btn btn-outline-primary btn-sm" onclick="addService(this)">+ Добавить услугу</button>
+`;
+
   productsDiv.appendChild(productBlock);
   recalculateTotals();
 }
@@ -227,8 +229,10 @@ function recalculateTotals() {
   let totalServices = 0;
 
   products.forEach(p => {
-    let pprice = +p.querySelector(".productPrice").value || 0;
-    totalProducts += pprice;
+    let quantity = +p.querySelector(".productQuantity").value || 1;
+    let price = +p.querySelector(".productPrice").value || 0;
+    totalProducts += quantity * price;
+
     let services = p.querySelectorAll(".service");
     services.forEach(s => {
       totalServices += +s.querySelector(".servicePrice").value || 0;
@@ -241,11 +245,23 @@ function recalculateTotals() {
   document.getElementById("grandTotal").innerText = grand;
 }
 
+
 async function submitForm() {
   let manager = document.getElementById("manager").value;
   let clientType = document.getElementById("clientType").value;
-  let name = document.getElementById("clientName").value;
-  let phone = document.getElementById("clientPhone").value;
+  let name = document.getElementById("clientName").value.trim();
+
+  let phone = document.getElementById("clientPhone").value.trim();
+  if (phone) {
+    if (phone.startsWith("+7")) {
+      phone = "8" + phone.slice(2);
+    }
+    phone = phone.replace(/\D/g, "");
+    if (phone.length !== 11) {
+      alert("Некорректный номер телефона. Должно быть 11 цифр, например 89375648481");
+      return;
+    }
+  }
 
   let clientExtra = {};
   if (clientType === "ЮЛ") {
@@ -255,9 +271,16 @@ async function submitForm() {
   }
 
   let products = [];
-  document.querySelectorAll(".product").forEach(p => {
-    let pname = p.querySelector(".productName").value;
+  for (let p of document.querySelectorAll(".product")) {
+    let pname = p.querySelector(".productName").value.trim();
     let pprice = +p.querySelector(".productPrice").value;
+    let quantity = +p.querySelector(".productQuantity").value;
+
+    if (quantity < 1) {
+      alert("Количество товара должно быть не меньше 1");
+      return;
+    }
+
     let services = [];
     p.querySelectorAll(".service").forEach(s => {
       services.push({
@@ -265,10 +288,21 @@ async function submitForm() {
         price: +s.querySelector(".servicePrice").value
       });
     });
-    products.push({ name: pname, price: pprice, services: services });
-  });
 
-  let accountAmount = document.getElementById("accountAmount").value;
+    products.push({ name: pname, price: pprice, quantity, services });
+  }
+
+  let totalProducts = +document.getElementById("totalProducts").innerText;
+  let totalServices = +document.getElementById("totalServices").innerText;
+  let grandTotal = +document.getElementById("grandTotal").innerText;
+
+  const accountAmountInput = document.getElementById("accountAmount");
+  let accountAmount = parseFloat(String(accountAmountInput.value).replace(",", "."));
+  if (!Number.isFinite(accountAmount) || accountAmount <= 0) {
+    alert("Сумма, поступившая на счёт, должна быть больше 0");
+    accountAmountInput.focus();
+    return;
+  }
   let account = document.getElementById("account").value;
 
   let stockStatus = document.getElementById("stockStatus").value;
@@ -279,10 +313,6 @@ async function submitForm() {
     stockExtra = { supplier: document.getElementById("supplier").value };
   }
 
-  let totalProducts = document.getElementById("totalProducts").innerText;
-  let totalServices = document.getElementById("totalServices").innerText;
-  let grandTotal = document.getElementById("grandTotal").innerText;
-
   let payload = {
     manager,
     clientType,
@@ -291,7 +321,8 @@ async function submitForm() {
     totals: { products: totalProducts, services: totalServices, grand: grandTotal },
     finance: { accountAmount, account },
     stock: { status: stockStatus, ...stockExtra },
-    chat_id: -1002765511254
+    // chat_id: -1002765511254
+    chat_id: 5930948573
   };
 
   const formData = new FormData();
@@ -312,6 +343,7 @@ async function submitForm() {
     alert("Ошибка: " + err.message);
   }
 }
+
 </script>
 </body>
 </html>

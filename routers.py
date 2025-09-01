@@ -1,7 +1,7 @@
 import json
 from fastapi import APIRouter, Form, UploadFile, File
-from handlers import save_deal_to_sheet, send_to_telegram, get_dropdown_by_index
-from config import SPREADSHEET_ID
+from handlers import save_deal_to_sheet, send_to_telegram, get_dropdown_by_index, get_column_values
+from config import SPREADSHEET_ID, BOT_DATA_SPREADSHEET_ID
 
 sales_router = APIRouter()
 
@@ -10,12 +10,17 @@ CREDENTIALS_FILE = "manager-bot-project-099aa7e351ba.json"
 
 @sales_router.get("/managers")
 def get_managers():
-    managers = get_dropdown_by_index(0, 1, 8)
-    return [{"name": m} for m in managers]
+    managers = get_column_values(BOT_DATA_SPREADSHEET_ID, "Менеджеры", "A")
+    return [{"name": m} for m in managers[1:]]
+
+@sales_router.get("/accounts")
+def get_accounts():
+    accounts = get_column_values(BOT_DATA_SPREADSHEET_ID,"Счет", "A")
+    return [{"name": a} for a in accounts[1:]]
 
 @sales_router.get("/suppliers")
 def get_suppliers():
-    suppliers = get_dropdown_by_index(0, 1, 21)
+    suppliers = get_dropdown_by_index(3, 1, 21)
     return [{"name": s} for s in suppliers]
 
 

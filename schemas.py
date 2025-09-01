@@ -9,6 +9,7 @@ class Service(BaseModel):
 class Product(BaseModel):
     name: str
     price: float
+    quantity: int
     services: List[Service]
 
 class Client(BaseModel):

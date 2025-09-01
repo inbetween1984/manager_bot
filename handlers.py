@@ -40,26 +40,54 @@ def save_deal_to_sheet(data: dict):
         deal = Deal(**data)
 
         sh = gc.open_by_key(SPREADSHEET_ID)
-        ws = sh.sheet1
+        ws = sh.worksheet("Склад")
 
-        product_names = [p.name for p in deal.products]
-        product_cell = f"{len(product_names)} шт.; " + "; ".join(product_names)
+        product_parts = [f"{p.name} - {p.quantity}" for p in deal.products]
+        product_cell = " ".join(product_parts)
         status_product = "Заказать" if deal.stock.status == "Нет" else ""
         status_sale = "Резерв" if deal.clientType in ("ФЛ", "ЮЛ") else "Отсрочка оплаты"
 
+        col_values = get_column_values(SPREADSHEET_ID, "Склад", "A")
+
+        if col_values:
+            try:
+                last_deal_num = int(col_values[-1])
+                deal_num = last_deal_num + 1
+            except ValueError:
+                deal_num = 1
+        else:
+            deal_num = 1
+
+        next_row = len(col_values) + 1
+
         row = [
-            "", "", product_cell, "", "", "", status_product, status_sale,
+            deal_num, "", product_cell, "", "", "", status_product, status_sale,
             deal.manager, deal.totals.products, "", "", "", "", "", "", "",
             "", deal.clientType, deal.client.name, deal.client.phone or ""
         ]
-        next_row = len(ws.get_all_values()) + 1
-        ws.update(f"A{next_row}:U{next_row}", [row])
+
+        ws.update([row], f"A{next_row}:U{next_row}")
 
         return {"status": "ok", "row": next_row}
 
    except Exception as e:
        logging.error(f"Ошибка записи в таблицу: {e}")
        return {"status": "error", "message": str(e)}
+
+
+def get_column_values(sheet_id: str, sheet_name: str, column: str = "A"):
+    service = get_sheets_service()
+    range_name = f"{sheet_name}!{column}:{column}"
+
+    result = (
+        service.spreadsheets()
+        .values()
+        .get(spreadsheetId=sheet_id, range=range_name)
+        .execute()
+    )
+
+    values = result.get("values", [])
+    return [row[0] for row in values if row]
 
 
 def format_deal_message(data: dict) -> str:
@@ -79,8 +107,11 @@ def format_deal_message(data: dict) -> str:
     lines.append("Клиент:\n" + "\n".join(client_info))
 
     for i, product in enumerate(deal.products, start=1):
+        total_product_sum = product.price * product.quantity
         lines.append(f"\nТовар {i}: {product.name}")
-        lines.append(f"Сумма за товар: {product.price}")
+        lines.append(f"Количество: {product.quantity}")
+        lines.append(f"Цена за единицу: {product.price}")
+        lines.append(f"Сумма за товар: {total_product_sum}")
 
         if product.services:
             lines.append("Доп. услуги:")
@@ -98,6 +129,7 @@ def format_deal_message(data: dict) -> str:
         lines.append(f"Склад: есть, номер сделки {deal.stock.dealNumber}")
 
     return "\n".join(lines)
+
 
 
 async def send_to_telegram(data: dict, calculator: UploadFile, paymentFile: UploadFile):
