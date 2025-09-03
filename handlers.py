@@ -25,7 +25,6 @@ def get_dropdown_by_name(sheet_name: str, row_idx: int, col_idx: int):
         fields="sheets(properties(title),data(rowData(values(dataValidation))))"
     ).execute()
 
-    # Find the sheet with the given name
     for sheet in sheet_metadata['sheets']:
         if sheet['properties']['title'] == sheet_name:
             row_data = sheet['data'][0].get('rowData', [])
@@ -46,16 +45,7 @@ def save_deal_to_sheet(data: dict):
         ws = sh.worksheet("Склад")
 
         all_rows = ws.get_all_values()
-        data_rows = all_rows[1:]  # assuming row 1 is headers
-
-        # Find max deal number
-        max_deal = 0
-        deal_nums = set()
-        for row in data_rows:
-            if row and row[0].isdigit():
-                deal_num = int(row[0])
-                max_deal = max(max_deal, deal_num)
-                deal_nums.add(deal_num)
+        data_rows = all_rows[1:]
 
         product_parts = [f"{p.name} - {p.quantity}" for p in deal.products]
         product_cell = " ".join(product_parts)
@@ -74,16 +64,19 @@ def save_deal_to_sheet(data: dict):
                 raise ValueError(f"Deal number {target_deal} not found")
             deal_num_str = target_deal
         else:
-            # Find first empty C (column index 2)
+            last_filled_index = -1
+            last_deal_num = 0
             for i, row in enumerate(data_rows):
-                if not row[2].strip():
-                    next_row = i + 2
-                    # Check if there's already a deal number in this row
-                    deal_num_str = row[0] if row[0].isdigit() else str(max_deal + 1)
-                    break
+                if row and len(row) > 2 and row[2].strip():
+                    last_filled_index = i
+                    if row[0].isdigit():
+                        last_deal_num = int(row[0])
+            next_row = 2 + last_filled_index + 1 if last_filled_index >= 0 else 2
+
+            if next_row <= len(all_rows) and all_rows[next_row - 1][0].isdigit():
+                deal_num_str = all_rows[next_row - 1][0]
             else:
-                next_row = len(all_rows) + 1
-                deal_num_str = str(max_deal + 1)
+                deal_num_str = str(last_deal_num + 1)
 
         row = [
             deal_num_str, "", product_cell, "", "", "", status_product, status_sale,
