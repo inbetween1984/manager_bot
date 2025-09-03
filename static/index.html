@@ -115,8 +115,8 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
     });
     if (addOther) {
       let otherOpt = document.createElement("option");
-      otherOpt.value = "Другая";
-      otherOpt.textContent = "Другая";
+      otherOpt.value = "Другое";
+      otherOpt.textContent = "Другое";
       select.appendChild(otherOpt);
     }
   } catch (err) {
@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("manager").addEventListener("change", function() {
     let customDiv = document.getElementById("customManager");
     let customInput = document.getElementById("customManagerName");
-    if (this.value === "Другая") {
+    if (this.value === "Другое") {
       customDiv.style.display = "block";
       customInput.required = true;
     } else {
@@ -219,7 +219,7 @@ function addService(button) {
         <option value="Гравировка">Гравировка</option>
         <option value="ОС">Установка ОС</option>
         <option value="Замена комплектующих">Замена комплектующих</option>
-        <option value="Другая">Другая</option>
+        <option value="Другое">Другое</option>
       </select>
       <div class="customService mt-2" style="display: none;">
         <label class="form-label">Название услуги:</label>
@@ -238,7 +238,7 @@ function addService(button) {
 function toggleCustomService(select) {
   let customDiv = select.closest(".mb-3").querySelector(".customService");
   let customInput = customDiv.querySelector(".customServiceName");
-  if (select.value === "Другая") {
+  if (select.value === "Другое") {
     customDiv.style.display = "block";
     customInput.required = true;
   } else {
@@ -341,7 +341,7 @@ async function submitForm() {
     p.querySelectorAll(".service").forEach(s => {
       let snameSelect = s.querySelector(".serviceName");
       let sname = snameSelect.value;
-      if (sname === "Другая") {
+      if (sname === "Другое") {
         sname = s.querySelector(".customServiceName").value.trim();
         if (!sname) {
           alert("Введите название услуги");
@@ -386,8 +386,8 @@ async function submitForm() {
     totals: { products: totalProducts, services: totalServices, grand: grandTotal },
     finance: { accountAmount, account },
     stock: { status: stockStatus, ...stockExtra },
-    // chat_id: -1004765093240
-    chat_id: 5930948573
+    chat_id: -1004765093240
+    //chat_id: 5930948573
   };
 
   const formData = new FormData();
