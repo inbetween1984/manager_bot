@@ -20,6 +20,10 @@
       <select id="manager" class="form-select" required>
         <option value="">-- загружается... --</option>
       </select>
+      <div id="customManager" style="display: none;" class="mt-2">
+        <label class="form-label">Имя менеджера:</label>
+        <input type="text" id="customManagerName" class="form-control">
+      </div>
     </div>
 
     <div class="mb-3">
@@ -95,7 +99,7 @@
   tg.ready();
   tg.expand();
 
-async function loadOptions(endpoint, selectId, placeholder="-- выберите --") {
+async function loadOptions(endpoint, selectId, placeholder="-- выберите --", addOther=false) {
   try {
     let response = await fetch(endpoint);
     if (!response.ok) throw new Error("Ошибка загрузки: " + response.status);
@@ -109,6 +113,12 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
       opt.textContent = item.name;
       select.appendChild(opt);
     });
+    if (addOther) {
+      let otherOpt = document.createElement("option");
+      otherOpt.value = "Другая";
+      otherOpt.textContent = "Другая";
+      select.appendChild(otherOpt);
+    }
   } catch (err) {
     console.error("Ошибка:", err);
     let select = document.getElementById(selectId);
@@ -117,8 +127,20 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  loadOptions(`api/managers`, "manager");
+  loadOptions(`api/managers`, "manager", "-- выберите --", true);
   loadOptions(`api/accounts`, "account");
+
+  document.getElementById("manager").addEventListener("change", function() {
+    let customDiv = document.getElementById("customManager");
+    let customInput = document.getElementById("customManagerName");
+    if (this.value === "Другая") {
+      customDiv.style.display = "block";
+      customInput.required = true;
+    } else {
+      customDiv.style.display = "none";
+      customInput.required = false;
+    }
+  });
 });
 
 function toggleClientFields() {
@@ -172,24 +194,37 @@ function addProduct() {
   </div>
   <div class="services"></div>
   <button type="button" class="btn btn-outline-primary btn-sm" onclick="addService(this)">+ Добавить услугу</button>
+  <button type="button" class="btn btn-danger btn-sm mt-2" onclick="removeProduct(this)">Удалить товар</button>
 `;
 
   productsDiv.appendChild(productBlock);
   recalculateTotals();
 }
 
+function removeProduct(button) {
+  let productBlock = button.closest(".product");
+  productBlock.remove();
+  recalculateTotals();
+}
+
 function addService(button) {
   let servicesDiv = button.previousElementSibling;
   let service = document.createElement("div");
-  service.className = "service";
+  service.className = "service mb-3";
   service.innerHTML = `
     <div class="mb-3">
       <label class="form-label">Услуга:</label>
-      <select class="form-select serviceName" required>
+      <select class="form-select serviceName" required onchange="toggleCustomService(this)">
+        <option value="">-- выберите --</option>
         <option value="Гравировка">Гравировка</option>
         <option value="ОС">Установка ОС</option>
         <option value="Замена комплектующих">Замена комплектующих</option>
+        <option value="Другая">Другая</option>
       </select>
+      <div class="customService mt-2" style="display: none;">
+        <label class="form-label">Название услуги:</label>
+        <input type="text" class="form-control customServiceName">
+      </div>
     </div>
     <div class="mb-3">
       <label class="form-label">Цена услуги:</label>
@@ -198,6 +233,18 @@ function addService(button) {
   `;
   servicesDiv.appendChild(service);
   recalculateTotals();
+}
+
+function toggleCustomService(select) {
+  let customDiv = select.closest(".mb-3").querySelector(".customService");
+  let customInput = customDiv.querySelector(".customServiceName");
+  if (select.value === "Другая") {
+    customDiv.style.display = "block";
+    customInput.required = true;
+  } else {
+    customDiv.style.display = "none";
+    customInput.required = false;
+  }
 }
 
 function toggleStockFields() {
@@ -247,7 +294,16 @@ function recalculateTotals() {
 
 
 async function submitForm() {
-  let manager = document.getElementById("manager").value;
+  let managerSelect = document.getElementById("manager");
+  let manager = managerSelect.value;
+  if (manager === "Другое") {
+    manager = document.getElementById("customManagerName").value.trim();
+    if (!manager) {
+      alert("Введите имя менеджера");
+      return;
+    }
+  }
+
   let clientType = document.getElementById("clientType").value;
   let name = document.getElementById("clientName").value.trim();
 
@@ -283,8 +339,17 @@ async function submitForm() {
 
     let services = [];
     p.querySelectorAll(".service").forEach(s => {
+      let snameSelect = s.querySelector(".serviceName");
+      let sname = snameSelect.value;
+      if (sname === "Другая") {
+        sname = s.querySelector(".customServiceName").value.trim();
+        if (!sname) {
+          alert("Введите название услуги");
+          return;
+        }
+      }
       services.push({
-        name: s.querySelector(".serviceName").value,
+        name: sname,
         price: +s.querySelector(".servicePrice").value
       });
     });

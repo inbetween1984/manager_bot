@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, Form, UploadFile, File
-from handlers import save_deal_to_sheet, send_to_telegram, get_dropdown_by_index, get_column_values
+from handlers import save_deal_to_sheet, send_to_telegram, get_dropdown_by_name, get_column_values
 from config import SPREADSHEET_ID, BOT_DATA_SPREADSHEET_ID
 
 sales_router = APIRouter()
@@ -20,8 +20,8 @@ def get_accounts():
 
 @sales_router.get("/suppliers")
 def get_suppliers():
-    suppliers = get_dropdown_by_index(3, 1, 21)
-    return [{"name": s} for s in suppliers]
+    suppliers = get_column_values(SPREADSHEET_ID, "Справочник", "N")
+    return [{"name": s} for s in suppliers[1:]]
 
 
 @sales_router.post("/submit")

@@ -17,51 +17,76 @@ def get_sheets_service():
     return build("sheets", "v4", credentials=CREDS)
 
 
-def get_dropdown_by_index(sheet_index: int, row_idx: int, col_idx: int):
+def get_dropdown_by_name(sheet_name: str, row_idx: int, col_idx: int):
     service = get_sheets_service()
 
     sheet_metadata = service.spreadsheets().get(
         spreadsheetId=SPREADSHEET_ID,
-        fields="sheets(data(rowData(values(dataValidation))))"
+        fields="sheets(properties(title),data(rowData(values(dataValidation))))"
     ).execute()
 
-    row_data = sheet_metadata['sheets'][sheet_index]['data'][0].get('rowData', [])
-    if len(row_data) > row_idx and 'values' in row_data[row_idx]:
-        cell_data = row_data[row_idx]['values'][col_idx]
-        data_validation = cell_data.get('dataValidation')
+    # Find the sheet with the given name
+    for sheet in sheet_metadata['sheets']:
+        if sheet['properties']['title'] == sheet_name:
+            row_data = sheet['data'][0].get('rowData', [])
+            if len(row_data) > row_idx and 'values' in row_data[row_idx]:
+                cell_data = row_data[row_idx]['values'][col_idx]
+                data_validation = cell_data.get('dataValidation')
 
-        if data_validation and 'condition' in data_validation:
-            return [v['userEnteredValue'] for v in data_validation['condition']['values']]
+                if data_validation and 'condition' in data_validation:
+                    return [v['userEnteredValue'] for v in data_validation['condition']['values']]
 
     return []
 
 def save_deal_to_sheet(data: dict):
-   try:
+    try:
         deal = Deal(**data)
 
         sh = gc.open_by_key(SPREADSHEET_ID)
         ws = sh.worksheet("Склад")
+
+        all_rows = ws.get_all_values()
+        data_rows = all_rows[1:]  # assuming row 1 is headers
+
+        # Find max deal number
+        max_deal = 0
+        deal_nums = set()
+        for row in data_rows:
+            if row and row[0].isdigit():
+                deal_num = int(row[0])
+                max_deal = max(max_deal, deal_num)
+                deal_nums.add(deal_num)
 
         product_parts = [f"{p.name} - {p.quantity}" for p in deal.products]
         product_cell = " ".join(product_parts)
         status_product = "Заказать" if deal.stock.status == "Нет" else ""
         status_sale = "Резерв" if deal.clientType in ("ФЛ", "ЮЛ") else "Отсрочка оплаты"
 
-        col_values = get_column_values(SPREADSHEET_ID, "Склад", "A")
+        is_update = deal.stock.status == "Есть" and hasattr(deal.stock, 'dealNumber') and deal.stock.dealNumber
 
-        if col_values:
-            try:
-                last_deal_num = int(col_values[-1])
-                deal_num = last_deal_num + 1
-            except ValueError:
-                deal_num = 1
+        if is_update:
+            target_deal = str(deal.stock.dealNumber)
+            for i, row in enumerate(data_rows):
+                if row[0] == target_deal:
+                    next_row = i + 2
+                    break
+            else:
+                raise ValueError(f"Deal number {target_deal} not found")
+            deal_num_str = target_deal
         else:
-            deal_num = 1
-
-        next_row = len(col_values) + 1
+            # Find first empty C (column index 2)
+            for i, row in enumerate(data_rows):
+                if not row[2].strip():
+                    next_row = i + 2
+                    # Check if there's already a deal number in this row
+                    deal_num_str = row[0] if row[0].isdigit() else str(max_deal + 1)
+                    break
+            else:
+                next_row = len(all_rows) + 1
+                deal_num_str = str(max_deal + 1)
 
         row = [
-            deal_num, "", product_cell, "", "", "", status_product, status_sale,
+            deal_num_str, "", product_cell, "", "", "", status_product, status_sale,
             deal.manager, deal.totals.products, "", "", "", "", "", "", "",
             "", deal.clientType, deal.client.name, deal.client.phone or ""
         ]
@@ -70,9 +95,9 @@ def save_deal_to_sheet(data: dict):
 
         return {"status": "ok", "row": next_row}
 
-   except Exception as e:
-       logging.error(f"Ошибка записи в таблицу: {e}")
-       return {"status": "error", "message": str(e)}
+    except Exception as e:
+        logging.error(f"Ошибка записи в таблицу: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 def get_column_values(sheet_id: str, sheet_name: str, column: str = "A"):
