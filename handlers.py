@@ -183,5 +183,8 @@ async def send_to_telegram(data: dict, calculator: UploadFile, paymentFile: Uplo
     try:
         response = requests.post(url, data=payload, files=files)
         response.raise_for_status()
+        logging.info(f"Successfully sent to Telegram chat {chat_id}")
     except requests.RequestException as e:
-        raise e
+        error_message = f"Failed to send to Telegram: HTTP {response.status_code}, Response: {response.text}"
+        logging.error(error_message)
+        raise Exception(error_message)
