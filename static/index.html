@@ -15,6 +15,11 @@
   <div class="container">
     <h2 class="mb-4">Форма сделки</h2>
 
+      <div class="mb-3">
+        <label class="form-label">Ссылка на сделку в CRM:</label>
+        <input type="url" id="crmLink" class="form-control" placeholder="https://..." required>
+      </div>
+
     <div class="mb-3">
       <label class="form-label">Менеджер:</label>
       <select id="manager" class="form-select" required>
@@ -68,6 +73,10 @@
       <select id="account" class="form-select" required>
         <option value="">-- загружается... --</option>
       </select>
+      <div id="customAccount" style="display: none;" class="mt-2">
+        <label class="form-label">Название счёта:</label>
+        <input type="text" id="customAccountName" class="form-control">
+      </div>
     </div>
 
     <h4>Склад</h4>
@@ -128,7 +137,7 @@ async function loadOptions(endpoint, selectId, placeholder="-- выберите 
 
 document.addEventListener("DOMContentLoaded", () => {
   loadOptions(`api/managers`, "manager", "-- выберите --", true);
-  loadOptions(`api/accounts`, "account");
+  loadOptions(`api/accounts`, "account", "-- выберите --", true);
 
   document.getElementById("manager").addEventListener("change", function() {
     let customDiv = document.getElementById("customManager");
@@ -141,6 +150,19 @@ document.addEventListener("DOMContentLoaded", () => {
       customInput.required = false;
     }
   });
+
+  document.getElementById("account").addEventListener("change", function() {
+    let customDiv = document.getElementById("customAccount");
+    let customInput = document.getElementById("customAccountName");
+    if (this.value === "Другое") {
+      customDiv.style.display = "block";
+      customInput.required = true;
+    } else {
+      customDiv.style.display = "none";
+      customInput.required = false;
+    }
+  });
+
 });
 
 function toggleClientFields() {
@@ -294,12 +316,23 @@ function recalculateTotals() {
 
 
 async function submitForm() {
+  const btn = document.querySelector("button.btn-success");
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = `
+    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    Данные отправляются, подождите...
+  `;
+
   let managerSelect = document.getElementById("manager");
   let manager = managerSelect.value;
   if (manager === "Другое") {
     manager = document.getElementById("customManagerName").value.trim();
     if (!manager) {
       alert("Введите имя менеджера");
+      btn.disabled = false;
+      btn.innerHTML = originalText;
       return;
     }
   }
@@ -308,16 +341,35 @@ async function submitForm() {
   let name = document.getElementById("clientName").value.trim();
 
   let phone = document.getElementById("clientPhone").value.trim();
+
+  let crmLink = document.getElementById("crmLink").value.trim();
+  if (!crmLink) {
+    alert("Укажите ссылку на сделку в CRM");
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+    return;
+  }
+
   if (phone) {
-    if (phone.startsWith("+7")) {
-      phone = "8" + phone.slice(2);
-    }
-    phone = phone.replace(/\D/g, "");
-    if (phone.length !== 11) {
-      alert("Некорректный номер телефона. Должно быть 11 цифр, например 89375648481");
-      return;
+    let raw = phone.replace(/\D/g, "");
+    if ((/^\+?\d{10,12}$/.test(phone))) {
+      if (phone.startsWith("+7")) {
+        phone = "8" + raw.slice(1);
+      } else if (raw.length === 11 && raw.startsWith("7")) {
+        phone = "8" + raw.slice(1);
+      } else {
+        phone = raw;
+      }
+
+      if (phone.length !== 11) {
+        alert("Некорректный номер телефона. Должно быть 11 цифр, например 89375648481");
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        return;
+      }
     }
   }
+
 
   let clientExtra = {};
   if (clientType === "ЮЛ") {
@@ -334,17 +386,21 @@ async function submitForm() {
 
     if (quantity < 1) {
       alert("Количество товара должно быть не меньше 1");
+      btn.disabled = false;
+      btn.innerHTML = originalText;
       return;
     }
 
     let services = [];
-    p.querySelectorAll(".service").forEach(s => {
+    for (let s of p.querySelectorAll(".service")) {
       let snameSelect = s.querySelector(".serviceName");
       let sname = snameSelect.value;
       if (sname === "Другое") {
         sname = s.querySelector(".customServiceName").value.trim();
         if (!sname) {
           alert("Введите название услуги");
+          btn.disabled = false;
+          btn.innerHTML = originalText;
           return;
         }
       }
@@ -352,7 +408,7 @@ async function submitForm() {
         name: sname,
         price: +s.querySelector(".servicePrice").value
       });
-    });
+    }
 
     products.push({ name: pname, price: pprice, quantity, services });
   }
@@ -365,10 +421,23 @@ async function submitForm() {
   let accountAmount = parseFloat(String(accountAmountInput.value).replace(",", "."));
   if (!Number.isFinite(accountAmount) || accountAmount <= 0) {
     alert("Сумма, поступившая на счёт, должна быть больше 0");
+    btn.disabled = false;
+    btn.innerHTML = originalText;
     accountAmountInput.focus();
     return;
   }
-  let account = document.getElementById("account").value;
+
+  let accountSelect = document.getElementById("account");
+  let account = accountSelect.value;
+  if (account === "Другое") {
+    account = document.getElementById("customAccountName").value.trim();
+    if (!account) {
+      alert("Введите название счёта");
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      return;
+    }
+  }
 
   let stockStatus = document.getElementById("stockStatus").value;
   let stockExtra = {};
@@ -379,6 +448,7 @@ async function submitForm() {
   }
 
   let payload = {
+    crmLink,
     manager,
     clientType,
     client: { name, phone, ...clientExtra },
@@ -405,6 +475,9 @@ async function submitForm() {
   } catch (err) {
     console.error(err);
     alert("Ошибка: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
   }
 }
 

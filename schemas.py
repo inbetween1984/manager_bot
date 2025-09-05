@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 
 class Service(BaseModel):
@@ -34,6 +34,7 @@ class Stock(BaseModel):
     supplier: Optional[str] = None
 
 class Deal(BaseModel):
+    crmLink: HttpUrl
     manager: str
     clientType: str
     client: Client

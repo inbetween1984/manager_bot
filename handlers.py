@@ -37,57 +37,34 @@ def get_dropdown_by_name(sheet_name: str, row_idx: int, col_idx: int):
 
     return []
 
-def save_deal_to_sheet(data: dict):
+def save_deal_to_sheet(data: dict, next_row: int):
     try:
         deal = Deal(**data)
-
         sh = gc.open_by_key(SPREADSHEET_ID)
         ws = sh.worksheet("Склад")
-
-        all_rows = ws.get_all_values()
-        data_rows = all_rows[1:]
 
         product_parts = [f"{p.name} - {p.quantity}" for p in deal.products]
         product_cell = " ".join(product_parts)
         status_product = "Заказать" if deal.stock.status == "Нет" else ""
         status_sale = "Резерв" if deal.clientType in ("ФЛ", "ЮЛ") else "Отсрочка оплаты"
 
-        is_update = deal.stock.status == "Есть" and hasattr(deal.stock, 'dealNumber') and deal.stock.dealNumber
+        deal_number = deal.stock.dealNumber if hasattr(deal.stock, 'dealNumber') else "Не указан"
 
-        if is_update:
-            target_deal = str(deal.stock.dealNumber)
-            for i, row in enumerate(data_rows):
-                if row[0] == target_deal:
-                    next_row = i + 2
-                    break
-            else:
-                raise ValueError(f"Deal number {target_deal} not found")
-            deal_num_str = target_deal
-        else:
-            last_filled_index = -1
-            last_deal_num = 0
-            for i, row in enumerate(data_rows):
-                if row and len(row) > 2 and row[2].strip():
-                    last_filled_index = i
-                    if row[0].isdigit():
-                        last_deal_num = int(row[0])
-            next_row = 2 + last_filled_index + 1 if last_filled_index >= 0 else 2
-
-            if next_row <= len(all_rows) and all_rows[next_row - 1][0].isdigit():
-                deal_num_str = all_rows[next_row - 1][0]
-            else:
-                deal_num_str = str(last_deal_num + 1)
-
-        row = [
-            deal_num_str, "", product_cell, "", "", "", status_product, status_sale,
-            deal.manager, deal.totals.products, "", "", "", "", "", "", "",
-            "", deal.clientType, deal.client.name, deal.client.phone or ""
+        updates = [
+            {"range": f"A{next_row}", "values": [[deal_number]]},
+            {"range": f"C{next_row}", "values": [[product_cell]]},
+            {"range": f"G{next_row}", "values": [[status_product]]},
+            {"range": f"H{next_row}", "values": [[status_sale]]},
+            {"range": f"I{next_row}", "values": [[deal.manager]]},
+            {"range": f"J{next_row}", "values": [[deal.totals.products]]},
+            {"range": f"S{next_row}", "values": [[deal.clientType]]},
+            {"range": f"T{next_row}", "values": [[deal.client.name]]},
+            {"range": f"U{next_row}", "values": [[deal.client.phone or ""]]},
         ]
 
-        ws.update([row], f"A{next_row}:U{next_row}")
+        ws.batch_update(updates)
 
         return {"status": "ok", "row": next_row}
-
     except Exception as e:
         logging.error(f"Ошибка записи в таблицу: {e}")
         return {"status": "error", "message": str(e)}
@@ -108,12 +85,55 @@ def get_column_values(sheet_id: str, sheet_name: str, column: str = "A"):
     return [row[0] for row in values if row]
 
 
+def get_deal_number(data: dict, spreadsheet_id: str) -> int:
+    try:
+        deal = Deal(**data)
+        sh = gc.open_by_key(spreadsheet_id)
+        ws = sh.worksheet("Склад")
+        all_rows = ws.get_all_values()
+        data_rows = all_rows[1:]
+
+        if deal.stock.status == "Есть" and hasattr(deal.stock, 'dealNumber') and deal.stock.dealNumber:
+            target_deal = str(deal.stock.dealNumber)
+            for i, row in enumerate(data_rows):
+                if row[0] == target_deal:
+                    data['stock']['dealNumber'] = target_deal
+                    return i + 2
+            raise ValueError(f"Deal number {target_deal} not found")
+
+        last_filled_index = -1
+        last_deal_num = 0
+        for i, row in enumerate(data_rows):
+            if row and len(row) > 2 and row[2].strip():
+                last_filled_index = i
+                if row[0].isdigit():
+                    last_deal_num = int(row[0])
+        next_row = 2 + last_filled_index + 1 if last_filled_index >= 0 else 2
+        deal_num_str = str(last_deal_num + 1)
+
+        if 'stock' not in data:
+            data['stock'] = {}
+        data['stock']['dealNumber'] = deal_num_str
+
+        return next_row
+    except Exception as e:
+        logging.error(f"Ошибка при определении номера сделки: {e}")
+        raise
+
 def format_deal_message(data: dict) -> str:
     deal = Deal(**data)
 
-    lines = [f"Менеджер: {deal.manager}", f"Тип клиента: {deal.clientType}"]
 
-    client_info = [f"Имя: {deal.client.name}"]
+    deal_number = deal.stock.dealNumber if hasattr(deal.stock, 'dealNumber') else "Не указан"
+
+    crm_link = f'<a href="{deal.crmLink}">[Открыть в CRM]</a>'
+
+    if deal.stock.status != "Есть":
+        lines = [f"Номер сделки: {deal_number}", f"Менеджер: {deal.manager}", f"Тип клиента: {deal.clientType}"]
+    else:
+        lines = [f"Менеджер: {deal.manager}", f"Тип клиента: {deal.clientType}"]
+
+    client_info = [f"{deal.client.name}"]
     if deal.client.phone:
         client_info.append(f"Телефон: {deal.client.phone}")
     if deal.client.inn:
@@ -122,7 +142,7 @@ def format_deal_message(data: dict) -> str:
         client_info.append(f"Компания: {deal.client.company}")
     if deal.client.orderNumber:
         client_info.append(f"Номер заказа: {deal.client.orderNumber}")
-    lines.append("Клиент:\n" + "\n".join(client_info))
+    lines.append("Клиент: " + "\n".join(client_info))
 
     for i, product in enumerate(deal.products, start=1):
         total_product_sum = product.price * product.quantity
@@ -144,7 +164,9 @@ def format_deal_message(data: dict) -> str:
     if deal.stock.status == "Нет":
         lines.append(f"Склад: нет, заказать у {deal.stock.supplier}")
     else:
-        lines.append(f"Склад: есть, номер сделки {deal.stock.dealNumber}")
+        lines.append(f"Склад: есть, номер сделки {deal_number}")
+
+    lines.append(crm_link)
 
     return "\n".join(lines)
 
@@ -160,6 +182,7 @@ async def send_to_telegram(data: dict, calculator: UploadFile, paymentFile: Uplo
             "type": "photo",
             "media": "attach://calculator",
             "caption": message,
+            "parse_mode": "HTML",
         },
         {
             "type": "photo",
